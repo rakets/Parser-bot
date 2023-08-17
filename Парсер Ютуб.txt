@@ -1,0 +1,275 @@
+Нужно состыковать работу парсера и бота,т.к везде есть свои таймауты.
+
+Регистрируем бот:
+1)Пишем бот фазеру
+2)регистрируем нового бота /newbot
+3)Даем название
+4)Даем никнейм
+5)Получаем токен(в нашем случае 6511234164:AAEgrC6a2atS2yzTCUPr5HcLjZsyfP1btpk)
+6)Включаем для бота повышенные права доступа в группах /setprivacy.Выбираем disable
+
+Открываем папку проекта в редакторе.Открываем терминал.Записываем команду
+	python -m venv venv
+т.е создадим виртуальное окружение,куда будем устанавливать доп.модуля и пакеты.
+В папке создаем новый пайтон-файл(youTubebot.py).
+
+Айограм обязательно должен быть установлен в вируальное окружение!
+Нужно использовать python 3.8
+
+Активируем виртуальное окружение.
+Выбираем интерпретатор,активируем и запускаем терминал.Пишем команду
+	pip install aiogram
+Устанавливаются необходимые пакеты,для работы с этой библиотекой.
+_________________________
+Теперь нам где-то нужно припрятать токен.
+
+Создаем рядом новый пайтон файл,называем его config.py и вставляем туда наш токен
+	TOKEN = '6511234164:AAEgrC6a2atS2yzTCUPr5HcLjZsyfP1btpk'
+Далее импортируем его из файла config.py в основной файл
+	from config import TOKEN
+____________________________
+Нужно подготовить проект нашего бота,что бы туда дописать наш парсер.
+
+Бота можно стартовать при помощи веб-хука(размещаем на сервере) или полинга(размещаем у себя на машине).
+Для теста запустим его у себя на машине при помощи полинга.
+
+Формируем костяк нашего бота:
+	Прописываем все нужные импорты
+		from aiogram import Bot, types, utils
+		from aiogram.dispatcher import Dispatcher
+		from aiogram.utils import executor
+		from aiogram.types import InputTextMessageContent, InlineQueryResultArticle
+Инициализируем класс бота:
+		bot = Bot(token=TOKEN)
+Создаем диспэтчер:
+		dp = Dispatcher(bot)
+Записываем экзекьютер(непосредственно старт нашего полинга)
+		executor.start_polling(dp, skip_updates=True)
+
+Проверим работу.Запускаем код,если в терминале выдает
+	Updates were skipped successfully.
+то все работает.
+__________________________
+Теперь переходи непосредственно к парсингу.
+
+Комментируем код,который ранее написали.
+
+Прежде чем что-то парсить нужно определиться как это делать.В питон очень много способов как можно парсить код.
+
+Мы будем использовать библиотеку requests (что бы посывалать url запросы) и библиотеку beautifulsoup(для парсинга).
+Есть куча других инструментов и готовых решений.
+
+___
+Для начала нам нужно послать запрос для получения html кода.
+
+Если брать ютуб,то нам нужно будет найти эл-ты видео.
+Вбиваем в поиске по коду страницы идентификатор Q|9noM4utV4 и находим тег по которому все это расположено.
+Ютуб спрятал все видео в один тег script,который нам нужно спарсить и разобрать,что бы оттуда хоть что-то вытянуть.
+Для этого в терминале в файле пишем
+	pip install requests beautifulsoup4 lxml
+тем самым устанавливаем в окружение библиотку requests и beautifulsoup.Так же установим парсер lxml (проверим лучше или хуже 
+он работает,чем встроенный парсер в библиотеку beautifulsoup)  
+
+Импортируем нужные эл-т 
+	import requests
+	from bs4 import BeautifulSoup
+	import re
+Нам потребуется использовать регулярные выражения (неправильный выбор).
+Посылаем запрос,будем искать в данном случае пайтон.
+	response = requests.get('https://www.youtube.com/results?search_query=python')
+Формируем запрос,разбираем все это при помощи Beautifulsoup
+	soup = BeautifulSoup(response.content, 'lxml')
+Ищем тег script
+	search = soup.find_all('script')
+Далее,что бы проверить напишем print(search),что бы посмотреть что выведет lxml парсерю
+
+	def searcher():
+	    response = requests.get('https://www.youtube.com/results?search_query=python')
+	    soup = BeautifulSoup(response.content, 'lxml')
+    	    search = soup.find_all('script')
+    	    print(search)
+
+	searcher()
+
+Как оказалось lxml парсер не нашел ничего(точнее очень мало кода),поэтому в случае с ютубом подойдет стандартный html.parser,который встроен в Beautifulsoup.
+Он находит гораздо больше кода на странице.
+
+	def searcher():
+	    response = requests.get('https://www.youtube.com/results?search_query=python')
+	    soup = BeautifulSoup(response.content, 'html.parser')
+    	    search = soup.find_all('script')
+    	    print(search)
+
+	searcher()	 
+
+Теперь тут нам нужно найти тег script.Их там много,поэтому что бы облегчить работу питону,выберем 32 в списке.
+
+	def searcher():
+	    response = requests.get('https://www.youtube.com/results?search_query=python')
+	    soup = BeautifulSoup(response.content, 'html.parser')
+    	    search = soup.find_all('script')[32]
+    	    print(search)
+
+	searcher()	
+
+Далее формируем регулярное выражение,т.к там идентификаторы видео закреплены под ключем videoId.Пишем простое регулярное выражение
+	key = '"videoId":"'
+    	data = re.findall(key+r"([^*]{11})", str(search))
+
+И выводим результат в консоль 
+	
+	def searcher():
+	    response = requests.get('https://www.youtube.com/results?search_query=python')
+    	    soup = BeautifulSoup(response.content, 'html.parser')
+    	    search = soup.find_all('script')[32]
+    	    key = '"videoId":"'
+    	    data = re.findall(key+r"([^*]{11})", str(search))
+    	    print(data)
+	searcher()
+
+Можно убрать [32],если выдает пустой список [].
+
+Мы нашли идентификаторы,они повторяются,все это нужно чистить.Этот вариант(с регулярными выражениями)не сильно нам подходит т.к он работает медленно.
+__
+В целом, для более надежного и эффективного парсинга YouTube рекомендуется использовать YouTube API, который предоставляет доступ к данным и метаданным 
+видео через официальный интерфейс. Это позволит вам получить доступ к данным в структурированном и надежном формате, без необходимости парсить HTML.
+
+Пробуем найти вариант работы с API (у ютуба оно есть) https://developers.google.com/youtube/v3?hl=ru
+Т.е можно посылать ip запросы и он будет выдавать результат,но там нужно регистрироваться,там ограниченное кол-во вариантов и выбор падает уже на готовое
+решение - на библиотеку YoutubeSearch (в поисковике python youtube search       https://pypi.org/project/youtube-search-python/).Дает готовое решение
+_____
+Устанавливаем библиотеку YoutubeSearch,в терминале пишем(устанавливаем виртуальное окружение)
+	pip install youtube-search          работает,но вообще лучше открыть документаци и посмотреть там,там другой метод установки.
+Тот код который был до этого нам не подходит
+	import requests
+	from bs4 import BeautifulSoup
+	import re
+
+	def searcher():
+    	    response = requests.get('https://www.youtube.com/results?search_query=python')
+            soup = BeautifulSoup(response.content, 'html.parser')
+    	    search = soup.find_all('script')[0]
+    	    key = '"videoId":"'
+    	    data = re.findall(key+r"([^*]{11})", str(search))
+    	    print(data)
+	searcher()
+Его можем удалить.
+
+Теперь импортируем YoutubeSearch из библиотеки youtube_search
+	from youtube_search import YoutubeSearch
+Запишем код сразу в ф-ию,что бы потом не переделывать.
+	Посылаем запрос,тут указываем кол-во результатов из поиска,которые выведутся.Это все выведется в словарь(есть спец.метод .to_dict() )
+		res = YoutubeSearch('python hub studio telegram бот', max_results = 1).to_dict()
+	Далее,что бы посмотреть как этот словарь выглядит,запишем это все в файлик
+		with open('text.py', 'w', encoding='utf-8') as r:
+        	     r.write(str(res))
+
+Вся функция:
+	def search():
+	    res = YoutubeSearch('python hub studio telegram бот', max_results = 1).to_dict()
+    	    with open('text.py', 'w', encoding='utf-8') as r:
+            	r.write(str(res))
+
+	search()
+
+После запуска кода,появится файл text.py
+Содержимое файла
+[{'id': 'ce1idtN6-wQ',
+  'thumbnails': ['https://i.ytimg.com/vi/ce1idtN6-wQ/hq720.jpg?sqp=-oaymwEjCOgCEMoBSFryq4qpAxUIARUAAAAAGAElAADIQj0AgKJDeAE=&rs=AOn4CLC1cNqj2QWmwKUEDbjUYgr9gV8nOA', 'https://i.ytimg.com/vi/ce1idtN6-wQ/hq720.jpg?sqp=-oaymwEXCNAFEJQDSFryq4qpAwkIARUAAIhCGAE=&rs=AOn4CLDe-0oN1z2bvVqwpAiObE0CZzkAkA'],
+  'title': 'Telegram бот на python - курс по созданию бота по документации aiogram и Telegram API',
+  'long_desc': None,
+  'channel': 'Python Hub Studio',
+  'duration': '1:36:05',
+  'views': '17\xa0653 wyświetlenia',
+  'publish_time': '2 miesiące temu',
+  'url_suffix': '/watch?v=ce1idtN6-wQ&pp=ygUhcHl0aG9uIGh1YiBzdHVkaW8gdGVsZWdyYW0g0LHQvtGC'}]
+
+Тут библиотека выведет айдишник,айдишник картинки и т.д.Всю информацию,которая нам нужна по видосу.
+___________________________________________________________
+
+Итак,что мы имеем на данном случае:
+Есть ютуб и нам его нужно спарсить.Мы попробовали несколько вариантов и самый подходящий был уже готовый.
+____________________________________________________________
+Теперь из ф-ии запроса можем удалить запись словаря в файлик.Вместо этого добавим вывод из ф-ии результата, max_results тут поставили равынй 10
+код функции теперь:
+	def search():
+	    res = YoutubeSearch('python hub studio telegram бот', max_results = 10).to_dict()
+    	    return res
+
+Возвращаем код бота,который закоментировали в самом начале(переносим все ипорты вверх и т.д),оставляем ф-ию запроса(нам там больше ничего писать не нужно,
+просто вернуть результат работы скрипта).
+	from youtube_search import YoutubeSearch
+	from config import TOKEN
+	from aiogram import Bot, types, utils
+	from aiogram.dispatcher import Dispatcher
+	from aiogram.utils import executor
+	from aiogram.types import InputTextMessageContent, InlineQueryResultArticle
+
+	def searcher():
+	    res = YoutubeSearch('python hub studio telegram бот', max_results = 10).to_dict()
+	    return res
+
+	bot = Bot(token=TOKEN)
+	dp = Dispatcher(bot)
+
+	executor.start_polling(dp, skip_updates=True)
+
+Теперь до экзекьютера записываем обычный инлайн-хендлер,который срабатывает,когда имя нашего бота через @ упоминается
+	@dp.inline_handler()
+	async def inline_handler(query : types.InlineQuery):
+теперь в него записываем следующее:
+в поле text попадает запрос
+	text = query.query or 'echo'
+далее запрос отправляем на парсинг,получаем список
+	links = searcher(text)
+далее формируем инлайн куэри артикль(т.е это окно с результатом парсинга) 
+	articles = [types.InlineQueryResultArticle(
+        id = hashlib.md5(f'{link["id"]}'.encode()).hexdigest(),
+        title = f'{link["title"]}',
+        url = f'https://www.youtube.com/watch?v={link["id"]}',
+        thumb_url = f'{link["thumbnails"][0]}',
+        input_message_content=types.InputTextMessageContent(
+            message_text = f'https://www.youtube.com/watch?v={link["id"]}')
+    ) for link in links]
+
+и отправляем по нажатию кнопки ссылку в чат:
+	await query.answer(articles, cache_time=60, is_personal=True)
+ы
+Весь  хэндлер:
+@dp.inline_handler()
+async def inline_handler(query : types.InlineQuery):
+    text = query.query or 'echo'
+    links = searcher(text)
+
+    articles = [types.InlineQueryResultArticle(
+        id = hashlib.md5(f'{link["id"]}'.encode()).hexdigest(),
+        title = f'{link["title"]}',
+        url = f'https://www.youtube.com/watch?v={link["id"]}',
+        thumb_url = f'{link["thumbnails"][0]}',
+        input_message_content=types.InputTextMessageContent(
+            message_text = f'https://www.youtube.com/watch?v={link["id"]}')
+    ) for link in links]
+
+    await query.answer(articles, cache_time=60, is_personal=True)
+
+executor.start_polling(dp, skip_updates=True)
+____
+Теперь нужно следующее.
+Пишем бот фазеру включить /setinline (включить инлайн режим работы данного бота)
+После активации нужно подождать где-то минуту,пока телеграм поймет,что появился еще один инайн-бот.
+Можно написать через пару минут ему в чат 'поиск в ютуб' к примеру.Он выдаст Success! Inline settings updated. /help
+Все готово.Теперь проверяем:
+	есть ошибка:
+		было:
+			def searcher():
+    				res = YoutubeSearch('python hub studio telegram бот', max_results = 10).to_dict()
+    				return res
+		стало:
+			def searcher(text):
+    				res = YoutubeSearch(text, max_results = 10).to_dict()
+    				return res
+	еще забыли импортировать библиотеку hashlib:
+		import hashlib
+______
+Теперь запускаем бота.
+
