@@ -10,7 +10,10 @@ def searcher(text):
     res = YoutubeSearch(text, max_results = 10).to_dict()
     return res
 
+#inicializd bot
 bot = Bot(token=TOKEN)
+
+#create dispatcher
 dp = Dispatcher(bot)
 
 @dp.inline_handler()
@@ -27,8 +30,9 @@ async def inline_handler(query : types.InlineQuery):
             message_text = f'https://www.youtube.com/watch?v={link["id"]}')
     ) for link in links]
 
-    await query.answer(articles, cache_time=60, is_personal=True)
+    await query.answer(articles, cache_time=60, is_personal=True) #Отправка результатов встроенного запроса пользователю.
 
+#create executor(start of polling)
 executor.start_polling(dp, skip_updates=True)
 
 
